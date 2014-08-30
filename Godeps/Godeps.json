@@ -1,0 +1,41 @@
+{
+	"ImportPath": "github.com/christopherL91/TimeGolang",
+	"GoVersion": "go1.3.1",
+	"Deps": [
+		{
+			"ImportPath": "github.com/clbanning/mxj",
+			"Rev": "e0d101c5beaa3211c7d460e73418b9169aea2e98"
+		},
+		{
+			"ImportPath": "github.com/dgrijalva/jwt-go",
+			"Comment": "v2.0.0-1-ged42077",
+			"Rev": "ed420779288d0fec5f095f6da7923d09e3108c05"
+		},
+		{
+			"ImportPath": "github.com/fatih/structs",
+			"Rev": "ebbcf66cbe3b86b7065f7801cbcb6a3134884868"
+		},
+		{
+			"ImportPath": "github.com/gin-gonic/gin/binding",
+			"Comment": "v0.4-4-g8e5397b",
+			"Rev": "8e5397bfa0277fe89bb27848d264402af56828b6"
+		},
+		{
+			"ImportPath": "github.com/gin-gonic/gin/render",
+			"Comment": "v0.4-4-g8e5397b",
+			"Rev": "8e5397bfa0277fe89bb27848d264402af56828b6"
+		},
+		{
+			"ImportPath": "github.com/gorilla/websocket",
+			"Rev": "4292df70df546334d4174bcd77271253c9b7835c"
+		},
+		{
+			"ImportPath": "github.com/julienschmidt/httprouter",
+			"Rev": "6db904312c78e5595a8d48c6b74fce77f407a33a"
+		},
+		{
+			"ImportPath": "gopkg.in/mgo.v2",
+			"Rev": "c9fd3712fbf3e92924c974dce16da2d322508fe2"
+		}
+	]
+}
