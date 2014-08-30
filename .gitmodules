@@ -1,0 +1,3 @@
+[submodule "gin"]
+	path = gin
+	url = git@github.com:gin-gonic/gin.git
