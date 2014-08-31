@@ -20,7 +20,7 @@ import (
 
 var (
 	mgo_session *mgo.Session
-	base_path
+	base_path   string
 )
 
 func init() {
