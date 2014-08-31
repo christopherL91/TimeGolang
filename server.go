@@ -10,6 +10,9 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os/exec"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
@@ -168,17 +171,13 @@ func main() {
 		result := serv["authenticationSuccess"].(map[string]interface{})
 		userid := result["user"].(string)
 
-		res, err = client.Get("https://www.kth.se/social/api/profile/1.1/" + userid)
-		if err != nil {
-			c.Fail(500, err)
-			return
-		}
-
-		data, err = ioutil.ReadAll(res.Body)
-		if err != nil {
-			c.Fail(500, err)
-			return
-		}
+		log.Println(userid)
+		out, err := exec.Command("/pkg/chpass/default/bin/pwsearch 1 " + userid + " 1 10").Output()
+		log.Println("The users full name is: " + string(out))
+		reg := regexp.MustCompile("([^:,]*)[:,]")
+		matches := reg.FindAllString(string(out), 5)
+		username := matches[0]
+		name := matches[4]
 
 		var profile map[string]interface{}
 		err = json.Unmarshal(data, &profile)
@@ -187,10 +186,9 @@ func main() {
 			return
 		}
 		userData := map[string]interface{}{
-			"kthid":      userid,
-			"firstname":  profile["givenName"],
-			"lastname":   profile["familyName"],
-			"profilepic": profile["image"],
+			"kthid":     username,
+			"firstname": strings.Split(name, " ")[0],
+			"lastname":  strings.Split(name, " ")[1],
 		}
 		id := updateLoginInfo(mgo_conn, userData)
 		payload := make(map[string]interface{})
