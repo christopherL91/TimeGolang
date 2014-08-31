@@ -19,6 +19,7 @@ import (
 
 var (
 	mgo_session *mgo.Session
+	base_path   = "http://parkour.csc.kth.se/api"
 )
 
 func init() {
@@ -141,7 +142,7 @@ func main() {
 	})
 
 	public.GET("/login/kth", func(c *gin.Context) {
-		c.Redirect(http.StatusTemporaryRedirect, "https://login.kth.se/login?service=http://localhost:3000/api/login/callback/kth")
+		c.Redirect(http.StatusTemporaryRedirect, "https://login.kth.se/login?service="+base_path+"/login/callback/kth")
 	})
 
 	public.GET("/login/callback/kth", func(c *gin.Context) {
@@ -152,7 +153,7 @@ func main() {
 		client := new(http.Client)
 		// kth_user := new(KTH_User)
 
-		res, err := client.Get("https://login.kth.se/serviceValidate?ticket=" + ticket + "&service=http://localhost:3000/api/login/callback/kth")
+		res, err := client.Get("https://login.kth.se/serviceValidate?ticket=" + ticket + "&service=" + base_path + "/login/callback/kth")
 		if err != nil {
 			c.Fail(500, err)
 			return
@@ -311,5 +312,5 @@ func main() {
 		c.JSON(200, result["logs"])
 	})
 
-	r.Run("localhost:3000")
+	r.Run(":3000")
 }
