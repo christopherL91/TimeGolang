@@ -20,14 +20,17 @@ import (
 
 var (
 	mgo_session *mgo.Session
-	base_path   = "http://parkour.csc.kth.se/api"
+	base_path
 )
 
 func init() {
 	var err error
+	base_path = os.Getenv("PARKOUR_BASE")
 	user := os.Getenv("MONGO_USER")
 	pass := os.Getenv("MONGO_PASS")
-	mgo_session, err = mgo.Dial("mongodb://" + user + ":" + pass + "@ds033760.mongolab.com:33760/parkour")
+	host := os.Getenv("MONGO_HOST")
+	port := os.Getenv("MONGO_PORT")
+	mgo_session, err = mgo.Dial("mongodb://" + user + ":" + pass + "@" + host + ":" + port + "/parkour")
 	if err != nil {
 		panic(err)
 	}
