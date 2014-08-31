@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -24,7 +25,9 @@ var (
 
 func init() {
 	var err error
-	mgo_session, err = mgo.Dial("127.0.0.1")
+	user := os.Getenv("MONGO_USER")
+	pass := os.Getenv("MONGO_PASS")
+	mgo_session, err = mgo.Dial("mongodb://" + user + ":" + pass + "@ds033760.mongolab.com:33760/parkour")
 	if err != nil {
 		panic(err)
 	}
