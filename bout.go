@@ -10,9 +10,10 @@ type User struct {
 }
 
 type Log struct {
-	Date   time.Time `json:"date"`
-	Action string    `json:"action" binding:"required"`
-	User   string    `json:"user"`
+	Date    time.Time `json:"date"`
+	Action  string    `json:"action" binding:"required"`
+	User    string    `json:"user" binding:"required"`
+	Creator string    `json:"creator"`
 }
 
 type Bout struct {

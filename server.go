@@ -287,7 +287,7 @@ func main() {
 		if c.Bind(boutlog) {
 			boutlog.Date = time.Now()
 			id := user["_id"].(string)
-			boutlog.User = id
+			boutlog.Creator = id
 			//Save boutlog to DB
 			boutid := bson.ObjectIdHex(bout)
 			err := mgo_session.DB("parkour").C("bouts").UpdateId(boutid, bson.M{
@@ -309,11 +309,18 @@ func main() {
 			server.messageCh <- &Message{
 				To: users,
 				Body: map[string]interface{}{
-					"user":   id,
-					"action": boutlog.Action,
+					"creator": id,
+					"action":  boutlog.Action,
 				},
 			}
 		}
+	})
+
+	/**
+	 * Allow editing of latest log.
+	 */
+	private.PUT("/bouts/:bout/logs/:log", func(c *gin.Context) {
+		c.Error(501, "Not yet implemented")
 	})
 
 	private.GET("/bouts/:bout/logs", func(c *gin.Context) {
