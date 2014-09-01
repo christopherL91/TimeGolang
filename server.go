@@ -179,12 +179,18 @@ func main() {
 		userid := result["user"].(string)
 
 		log.Println(userid)
-		out, err := exec.Command("/pkg/chpass/default/bin/pwsearch 1 " + userid + " 1 10").Output()
-		log.Println("The users full name is: " + string(out))
-		reg := regexp.MustCompile("([^:,]*)[:,]")
-		matches := reg.FindAllString(string(out), 5)
-		username := matches[0]
-		name := matches[4]
+		out, err := exec.Command("ldapsearch -x -LLL ugKthid=" + userid).Output()
+		reg := regexp.MustCompile("(?m)^([^:]+): ([^\n]+)$")
+		matches := reg.FindAllStringSubmatch(string(out), -1)
+		var matchmap map[string]string
+		for _, match := range matches {
+			key := match[1]
+			value := match[2]
+			matchmap[key] = value
+		}
+		username := matchmap["uid"]
+		name := matchmap["cn"]
+		firstname := matchmap["givenName"]
 
 		var profile map[string]interface{}
 		err = json.Unmarshal(data, &profile)
@@ -194,8 +200,8 @@ func main() {
 		}
 		userData := map[string]interface{}{
 			"kthid":     username,
-			"firstname": strings.Split(name, " ")[0],
-			"lastname":  strings.Split(name, " ")[1],
+			"firstname": firstname,
+			"name":      name,
 		}
 		id := updateLoginInfo(mgo_conn, userData)
 		payload := make(map[string]interface{})
