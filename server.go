@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"github.com/christopherL91/TimeGolang/gin"
 	"github.com/clbanning/mxj"
 	"github.com/gorilla/websocket"
@@ -192,12 +191,6 @@ func main() {
 		name := matchmap["cn"]
 		firstname := matchmap["givenName"]
 
-		var profile map[string]interface{}
-		err = json.Unmarshal(data, &profile)
-		if err != nil {
-			c.Fail(500, err)
-			return
-		}
 		userData := map[string]interface{}{
 			"kthid":     username,
 			"firstname": firstname,
@@ -205,7 +198,7 @@ func main() {
 		}
 		id := updateLoginInfo(mgo_conn, userData)
 		payload := make(map[string]interface{})
-		payload["name"] = profile["givenName"]
+		payload["name"] = userData["name"]
 		payload["_id"] = id
 		payload["exp"] = time.Now().Add(time.Hour * 24).Unix()
 		token, err := generateToken([]byte(secret), &payload)
@@ -287,6 +280,7 @@ func main() {
 		if c.Bind(boutlog) {
 			boutlog.Date = time.Now()
 			id := user["_id"].(string)
+			boutlog.ID = bson.NewObjectId()
 			boutlog.Creator = id
 			//Save boutlog to DB
 			boutid := bson.ObjectIdHex(bout)
@@ -320,7 +314,19 @@ func main() {
 	 * Allow editing of latest log.
 	 */
 	private.PUT("/bouts/:bout/logs/:log", func(c *gin.Context) {
-		c.Error(501, "Not yet implemented")
+		//Not implemented
+		c.Abort(501)
+		return
+		boutid := c.Params.ByName("bout")
+		logid := c.Params.ByName("log")
+		//Replace with time from client
+		date := time.Now()
+		mgo_session.DB("parkour").C("bouts").Update(bson.M{
+			"_id":      bson.ObjectIdHex(boutid),
+			"logs._id": bson.ObjectIdHex(logid),
+		}, bson.M{
+			"logs.$.date": date,
+		})
 	})
 
 	private.GET("/bouts/:bout/logs", func(c *gin.Context) {

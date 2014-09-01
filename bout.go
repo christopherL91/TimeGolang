@@ -1,6 +1,7 @@
 package main
 
 import (
+	"gopkg.in/mgo.v2/bson"
 	"time"
 )
 
@@ -10,10 +11,11 @@ type User struct {
 }
 
 type Log struct {
-	Date    time.Time `json:"date"`
-	Action  string    `json:"action" binding:"required"`
-	User    string    `json:"user" binding:"required"`
-	Creator string    `json:"creator"`
+	ID      bson.ObjectId `json:"_id"`
+	Date    time.Time     `json:"date"`
+	Action  string        `json:"action" binding:"required"`
+	User    string        `json:"user" binding:"required"`
+	Creator string        `json:"creator"`
 }
 
 type Bout struct {
