@@ -1,6 +1,7 @@
 package main
 
 import (
+       "encoding/base64"
 	"github.com/christopherL91/TimeGolang/gin"
 	"github.com/clbanning/mxj"
 	"github.com/gorilla/websocket"
@@ -146,18 +147,20 @@ func main() {
 	})
 
 	public.GET("/login/kth", func(c *gin.Context) {
-		c.Redirect(http.StatusTemporaryRedirect, "https://login.kth.se/login?service="+base_path+"/login/callback/kth")
+		url := []byte(c.Request.URL.Query().Get("url"))		
+		c.Redirect(http.StatusTemporaryRedirect, "https://login.kth.se/login?service="+base_path+"/login/callback/kth/"+base64.StdEncoding.EncodeToString(url))
 	})
 
-	public.GET("/login/callback/kth", func(c *gin.Context) {
+	public.GET("/login/callback/kth/:callback", func(c *gin.Context) {
 		mgo_conn := mgo_session.Copy()
 		defer mgo_conn.Close()
-
+		callback := c.Params.ByName("callback")
+		decoded, _ := base64.StdEncoding.DecodeString(callback)
+		callbackurl := string(decoded)
 		ticket := c.Request.URL.Query().Get("ticket")
 		client := new(http.Client)
-		// kth_user := new(KTH_User)
 
-		res, err := client.Get("https://login.kth.se/serviceValidate?ticket=" + ticket + "&service=" + base_path + "/login/callback/kth")
+		res, err := client.Get("https://login.kth.se/serviceValidate?ticket=" + ticket + "&service=" + base_path + "/login/callback/kth/"+callback)
 		if err != nil {
 			c.Fail(500, err)
 			return
@@ -177,10 +180,14 @@ func main() {
 		userid := result["user"].(string)
 
 		log.Println(userid)
-		out, err := exec.Command("ldapsearch -x -LLL ugKthid=" + userid).Output()
+		out, err := exec.Command("ldapsearch", "-x", "-LLL", "ugKthid=" + userid).Output()
+		if err != nil {
+		   c.Fail(500, err);
+		   return;
+		}
 		reg := regexp.MustCompile("(?m)^([^:]+): ([^\n]+)$")
 		matches := reg.FindAllStringSubmatch(string(out), -1)
-		var matchmap map[string]string
+		matchmap := make(map[string]string)
 		for _, match := range matches {
 			key := match[1]
 			value := match[2]
@@ -205,7 +212,7 @@ func main() {
 			c.Fail(500, err)
 			return
 		}
-		c.JSON(200, gin.H{"token": token})
+		c.Redirect(http.StatusTemporaryRedirect, callbackurl+"?token="+token)
 	})
 
 	private.GET("/ws", func(c *gin.Context) {
