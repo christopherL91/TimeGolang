@@ -1,7 +1,7 @@
 package main
 
 import (
-       "encoding/base64"
+	"encoding/base64"
 	"github.com/christopherL91/TimeGolang/gin"
 	"github.com/clbanning/mxj"
 	"github.com/gorilla/websocket"
@@ -127,6 +127,18 @@ func getBoutData(bout map[string]interface{}) map[string]interface{} {
 func main() {
 	secret := "I<3Unicorns"
 	r := gin.Default()
+	r.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Content-Type", "application/json")
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Headers",
+			"Content-Length, Content-Type, Accept-Encoding, "+
+				"X-CSRF-Token, Authorization")
+		if c.Request.Method == "OPTIONS" {
+			c.Abort(200)
+			return
+		}
+		c.Next()
+	})
 	server := &Server{
 		Connections: make(map[*websocket.Conn]string, 0),
 		Users:       make(map[string][]*websocket.Conn, 0),
@@ -147,7 +159,7 @@ func main() {
 	})
 
 	public.GET("/login/kth", func(c *gin.Context) {
-		url := []byte(c.Request.URL.Query().Get("url"))		
+		url := []byte(c.Request.URL.Query().Get("url"))
 		c.Redirect(http.StatusTemporaryRedirect, "https://login.kth.se/login?service="+base_path+"/login/callback/kth/"+base64.StdEncoding.EncodeToString(url))
 	})
 
@@ -160,7 +172,7 @@ func main() {
 		ticket := c.Request.URL.Query().Get("ticket")
 		client := new(http.Client)
 
-		res, err := client.Get("https://login.kth.se/serviceValidate?ticket=" + ticket + "&service=" + base_path + "/login/callback/kth/"+callback)
+		res, err := client.Get("https://login.kth.se/serviceValidate?ticket=" + ticket + "&service=" + base_path + "/login/callback/kth/" + callback)
 		if err != nil {
 			c.Fail(500, err)
 			return
@@ -180,10 +192,10 @@ func main() {
 		userid := result["user"].(string)
 
 		log.Println(userid)
-		out, err := exec.Command("ldapsearch", "-x", "-LLL", "ugKthid=" + userid).Output()
+		out, err := exec.Command("ldapsearch", "-x", "-LLL", "ugKthid="+userid).Output()
 		if err != nil {
-		   c.Fail(500, err);
-		   return;
+			c.Fail(500, err)
+			return
 		}
 		reg := regexp.MustCompile("(?m)^([^:]+): ([^\n]+)$")
 		matches := reg.FindAllStringSubmatch(string(out), -1)
