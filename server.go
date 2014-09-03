@@ -458,7 +458,7 @@ func main() {
 
 			for _, lab := range course.Labs {
 				//Give each lab a new unique id
-				lab.ID = bson.NewObjectId()
+				lab.ID = bson.NewObjectId().Hex()
 			}
 			err := mgo_conn.DB(DB_name).C("courses").Insert(course)
 			if err != nil {
