@@ -409,7 +409,7 @@ func main() {
 	private.GET("/users", func(c *gin.Context) {
 		mgo_conn := mgo_session.Copy()
 		defer mgo_conn.Close()
-		mgo_session.SetMode(mgo.Monotonic, true)
+		mgo_conn.SetMode(mgo.Monotonic, true)
 
 		var users []User
 		err := mgo_conn.DB(DB_name).C("users").Find(bson.M{}).All(&users)
@@ -424,7 +424,7 @@ func main() {
 		userID := c.Params.ByName("user")
 		mgo_conn := mgo_session.Copy()
 		defer mgo_conn.Close()
-		mgo_session.SetMode(mgo.Monotonic, true)
+		mgo_conn.SetMode(mgo.Monotonic, true)
 
 		user := new(User)
 		err := mgo_conn.DB(DB_name).C("users").FindId(bson.ObjectIdHex(userID)).One(user)
@@ -438,7 +438,7 @@ func main() {
 	private.GET("/courses", func(c *gin.Context) {
 		mgo_conn := mgo_session.Copy()
 		defer mgo_conn.Close()
-		mgo_session.SetMode(mgo.Monotonic, true)
+		mgo_conn.SetMode(mgo.Monotonic, true)
 
 		var courses []Course
 		err := mgo_conn.DB(DB_name).C("courses").Find(bson.M{}).All(&courses)
@@ -449,5 +449,24 @@ func main() {
 		c.JSON(200, courses)
 	})
 
+	private.POST("/courses", func(c *gin.Context) {
+		course := new(Course)
+		if c.Bind(course) {
+			mgo_conn := mgo_session.Copy()
+			defer mgo_conn.Close()
+			mgo_conn.SetMode(mgo.Monotonic, true)
+
+			for _, lab := range course.Labs {
+				//Give each lab a new unique id
+				lab.ID = bson.NewObjectId()
+			}
+			err := mgo_conn.DB(DB_name).C("courses").Insert(course)
+			if err != nil {
+				c.Fail(500, err)
+				return
+			}
+			c.JSON(200, gin.H{"status": "ok"})
+		}
+	})
 	r.Run(":3000")
 }

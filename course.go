@@ -5,12 +5,13 @@ import (
 )
 
 type Course struct {
-	ID   bson.ObjectId `json:"_id" bson:"_id"`
-	Name string        `json:"name"`
-	Code string        `json:"code"`
-	Labs []Lab         `json:"labs"`
+	ID   bson.ObjectId `json:"_id,omitempty" bson:"_id,omitempty"`
+	Name string        `json:"name" binding:"required"`
+	Code string        `json:"code" binding:"required"`
+	Labs []Lab         `json:"labs" binding:"required"`
 }
 
 type Lab struct {
-	Name string `json:"name"`
+	ID   bson.ObjectId `json:"_id,omitempty" bson:"_id,omitempty"`
+	Name string        `json:"name" binding:"required"`
 }
