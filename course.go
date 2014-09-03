@@ -12,6 +12,6 @@ type Course struct {
 }
 
 type Lab struct {
-	ID   bson.ObjectId `json:"_id,omitempty" bson:"_id,omitempty"`
+	ID   bson.ObjectId `json:"_id" bson:"_id"`
 	Name string        `json:"name" binding:"required"`
 }
