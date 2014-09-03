@@ -1,3 +1,5 @@
 *.crt
 *.csr
 *.key
+TimeGolang
+.DS_Store

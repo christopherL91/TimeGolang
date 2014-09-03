@@ -5,11 +5,6 @@ import (
 	"time"
 )
 
-type User struct {
-	ID   string
-	Name string
-}
-
 type Log struct {
 	ID      bson.ObjectId `json:"_id"`
 	Date    time.Time     `json:"date"`

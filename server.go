@@ -20,16 +20,18 @@ import (
 var (
 	mgo_session *mgo.Session
 	base_path   string
+	DB_name     string
 )
 
 func init() {
 	var err error
 	base_path = os.Getenv("PARKOUR_BASE")
+	DB_name = os.Getenv("MONGO_DB_NAME")
 	user := os.Getenv("MONGO_USER")
 	pass := os.Getenv("MONGO_PASS")
 	host := os.Getenv("MONGO_HOST")
 	port := os.Getenv("MONGO_PORT")
-	mgo_session, err = mgo.Dial("mongodb://" + user + ":" + pass + "@" + host + ":" + port + "/parkour")
+	mgo_session, err = mgo.Dial("mongodb://" + user + ":" + pass + "@" + host + ":" + port + "/" + DB_name)
 	if err != nil {
 		panic(err)
 	}
@@ -69,7 +71,6 @@ func (s *Server) removeConnection(conn *websocket.Conn) {
 		}
 	}
 	s.Users[id] = connections
-	log.Println("closed connection")
 }
 
 func (s *Server) sendMessage(data map[string]interface{}, conn *websocket.Conn) {
@@ -101,6 +102,10 @@ func (s *Server) listen() {
 }
 
 func getBoutData(bout map[string]interface{}) map[string]interface{} {
+	mgo_conn := mgo_session.Copy()
+	defer mgo_conn.Close()
+	mgo_conn.SetMode(mgo.Monotonic, true)
+
 	var users []map[string]interface{}
 	var userids []bson.ObjectId
 	userslice := bout["users"].([]interface{})
@@ -108,18 +113,27 @@ func getBoutData(bout map[string]interface{}) map[string]interface{} {
 		id := u.(string)
 		userids = append(userids, bson.ObjectIdHex(id))
 	}
-	mgo_session.DB("parkour").C("users").Find(bson.M{
+	err := mgo_conn.DB(DB_name).C("users").Find(bson.M{
 		"_id": bson.M{
 			"$in": userids,
 		},
 	}).All(&users)
+	if err != nil {
+		log.Fatalln(err.Error())
+		return nil
+	}
+
 	bout["users"] = users
 	var course map[string]interface{}
 	courseid := bout["course"].(string)
-	mgo_session.DB("parkour").C("courses").FindId(bson.ObjectIdHex(courseid)).Select(bson.M{
+	err = mgo_conn.DB(DB_name).C("courses").FindId(bson.ObjectIdHex(courseid)).Select(bson.M{
 		"name": 1,
 		"code": 1,
 	}).One(&course)
+	if err != nil {
+		log.Fatalln(err.Error())
+		return nil
+	}
 	bout["course"] = course
 	return bout
 }
@@ -127,18 +141,8 @@ func getBoutData(bout map[string]interface{}) map[string]interface{} {
 func main() {
 	secret := "I<3Unicorns"
 	r := gin.Default()
-	r.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Content-Type", "application/json")
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Headers",
-			"Content-Length, Content-Type, Accept-Encoding, "+
-				"X-CSRF-Token, Authorization")
-		if c.Request.Method == "OPTIONS" {
-			c.Abort(200)
-			return
-		}
-		c.Next()
-	})
+	r.Use(CORSMiddleware())
+
 	server := &Server{
 		Connections: make(map[*websocket.Conn]string, 0),
 		Users:       make(map[string][]*websocket.Conn, 0),
@@ -148,15 +152,13 @@ func main() {
 		mutex:       new(sync.Mutex),
 	}
 
+	//Start websocket server.
 	go server.listen()
 
+	//Public routes.
 	public := r.Group("/api")
-	private := r.Group("/api")
-	private.Use(tokenMiddleWare(secret)) //verify with JWT
-
-	public.GET("/", func(c *gin.Context) {
-		c.JSON(200, gin.H{"hello": "hello world"})
-	})
+	//Private routes. Will need a token to be used with.
+	private := r.Group("/api", tokenMiddleWare(secret))
 
 	public.GET("/login/kth", func(c *gin.Context) {
 		url := []byte(c.Request.URL.Query().Get("url"))
@@ -166,6 +168,8 @@ func main() {
 	public.GET("/login/callback/kth/:callback", func(c *gin.Context) {
 		mgo_conn := mgo_session.Copy()
 		defer mgo_conn.Close()
+		mgo_conn.SetMode(mgo.Monotonic, true)
+
 		callback := c.Params.ByName("callback")
 		decoded, _ := base64.StdEncoding.DecodeString(callback)
 		callbackurl := string(decoded)
@@ -191,7 +195,6 @@ func main() {
 		result := serv["authenticationSuccess"].(map[string]interface{})
 		userid := result["user"].(string)
 
-		log.Println(userid)
 		out, err := exec.Command("ldapsearch", "-x", "-LLL", "ugKthid="+userid).Output()
 		if err != nil {
 			c.Fail(500, err)
@@ -232,29 +235,44 @@ func main() {
 		user := u.(map[string]interface{})
 		conn, err := websocket.Upgrade(c.Writer, c.Request, nil, 1024, 1024)
 		if err != nil {
+			c.Fail(500, err)
 			return
 		}
 		id := user["_id"].(string)
 		server.addConnection(conn, id)
 	})
+
 	private.POST("/bouts", func(c *gin.Context) {
 		u, _ := c.Get("user")
 		user := u.(map[string]interface{})
 		bout := new(Bout)
 		if c.Bind(bout) {
+			mgo_conn := mgo_session.Copy()
+			defer mgo_conn.Close()
+			mgo_conn.SetMode(mgo.Monotonic, true)
+
 			userid := user["_id"].(string)
 			bout.Creator = userid
 			bout.Users = append(bout.Users, userid)
-			mgo_session.DB("parkour").C("bouts").Insert(bout)
+			err := mgo_conn.DB(DB_name).C("bouts").Insert(bout)
+			if err != nil {
+				c.Fail(500, err)
+				return
+			}
+			c.JSON(200, gin.H{"status": "ok"})
 		}
 	})
 
 	private.GET("/bouts", func(c *gin.Context) {
+		mgo_conn := mgo_session.Copy()
+		defer mgo_conn.Close()
+		mgo_conn.SetMode(mgo.Monotonic, true)
+
 		u, _ := c.Get("user")
 		user := u.(map[string]interface{})
 		userid := user["_id"].(string)
 		var result []map[string]interface{}
-		err := mgo_session.DB("parkour").C("bouts").Find(bson.M{
+		err := mgo_conn.DB("parkour").C("bouts").Find(bson.M{
 			"users": bson.M{
 				"$in": []string{userid},
 			},
@@ -277,9 +295,18 @@ func main() {
 
 	private.GET("/bouts/:bout", func(c *gin.Context) {
 		bout := c.Params.ByName("bout")
+
+		mgo_conn := mgo_session.Copy()
+		defer mgo_conn.Close()
+		mgo_conn.SetMode(mgo.Monotonic, true)
+
 		boutid := bson.ObjectIdHex(bout)
 		var result map[string]interface{}
-		mgo_session.DB("parkour").C("bouts").FindId(boutid).One(&result)
+		err := mgo_conn.DB("parkour").C("bouts").FindId(boutid).One(&result)
+		if err != nil {
+			c.Fail(500, err)
+			return
+		}
 		result = getBoutData(result)
 		c.JSON(200, result)
 	})
@@ -296,19 +323,24 @@ func main() {
 		user := u.(map[string]interface{})
 		boutlog := new(Log)
 		if c.Bind(boutlog) {
+			mgo_conn := mgo_session.Copy()
+			defer mgo_conn.Close()
+			mgo_conn.SetMode(mgo.Monotonic, true)
+
 			boutlog.Date = time.Now()
 			id := user["_id"].(string)
 			boutlog.ID = bson.NewObjectId()
 			boutlog.Creator = id
 			//Save boutlog to DB
 			boutid := bson.ObjectIdHex(bout)
-			err := mgo_session.DB("parkour").C("bouts").UpdateId(boutid, bson.M{
+			err := mgo_conn.DB(DB_name).C("bouts").UpdateId(boutid, bson.M{
 				"$push": bson.M{
 					"logs": boutlog,
 				},
 			})
 			if err != nil {
-				log.Println(err.Error())
+				c.Fail(500, err)
+				return
 			}
 			var result map[string]interface{}
 			mgo_session.DB("parkour").C("bouts").FindId(boutid).One(&result)
@@ -325,6 +357,7 @@ func main() {
 					"action":  boutlog.Action,
 				},
 			}
+			c.JSON(200, gin.H{"status": "ok"})
 		}
 	})
 
@@ -333,26 +366,73 @@ func main() {
 	 */
 	private.PUT("/bouts/:bout/logs/:log", func(c *gin.Context) {
 		//Not implemented
+		mgo_conn := mgo_session.Copy()
+		defer mgo_conn.Close()
+		mgo_conn.SetMode(mgo.Monotonic, true)
+
 		c.Abort(501)
 		return
 		boutid := c.Params.ByName("bout")
 		logid := c.Params.ByName("log")
 		//Replace with time from client
 		date := time.Now()
-		mgo_session.DB("parkour").C("bouts").Update(bson.M{
+		err := mgo_conn.DB("parkour").C("bouts").Update(bson.M{
 			"_id":      bson.ObjectIdHex(boutid),
 			"logs._id": bson.ObjectIdHex(logid),
 		}, bson.M{
 			"logs.$.date": date,
 		})
+		if err != nil {
+			c.Fail(500, err)
+			return
+		}
+		c.JSON(200, gin.H{"status": "ok"})
 	})
 
 	private.GET("/bouts/:bout/logs", func(c *gin.Context) {
 		bout := c.Params.ByName("bout")
+
+		mgo_conn := mgo_session.Copy()
+		defer mgo_conn.Close()
+		mgo_conn.SetMode(mgo.Monotonic, true)
+
 		boutid := bson.ObjectIdHex(bout)
 		var result map[string]interface{}
-		mgo_session.DB("parkour").C("bouts").FindId(boutid).One(&result)
+		err := mgo_conn.DB("parkour").C("bouts").FindId(boutid).One(&result)
+		if err != nil {
+			c.Fail(500, err)
+			return
+		}
 		c.JSON(200, result["logs"])
+	})
+
+	private.GET("/users", func(c *gin.Context) {
+		mgo_conn := mgo_session.Copy()
+		defer mgo_conn.Close()
+		mgo_session.SetMode(mgo.Monotonic, true)
+
+		var users []User
+		err := mgo_conn.DB(DB_name).C("users").Find(bson.M{}).All(&users)
+		if err != nil {
+			c.Fail(500, err)
+			return
+		}
+		c.JSON(200, users)
+	})
+
+	private.GET("/users/:user", func(c *gin.Context) {
+		userID := c.Params.ByName("user")
+		mgo_conn := mgo_session.Copy()
+		defer mgo_conn.Close()
+		mgo_session.SetMode(mgo.Monotonic, true)
+
+		user := new(User)
+		err := mgo_conn.DB(DB_name).C("users").FindId(bson.ObjectIdHex(userID)).One(user)
+		if err != nil {
+			c.Fail(500, err)
+			return
+		}
+		c.JSON(200, user)
 	})
 
 	r.Run(":3000")
