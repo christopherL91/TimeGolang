@@ -435,5 +435,19 @@ func main() {
 		c.JSON(200, user)
 	})
 
+	private.GET("/courses", func(c *gin.Context) {
+		mgo_conn := mgo_session.Copy()
+		defer mgo_conn.Close()
+		mgo_session.SetMode(mgo.Monotonic, true)
+
+		var courses []Course
+		err := mgo_conn.DB(DB_name).C("courses").Find(bson.M{}).All(&courses)
+		if err != nil {
+			c.Fail(500, err)
+			return
+		}
+		c.JSON(200, courses)
+	})
+
 	r.Run(":3000")
 }
