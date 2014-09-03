@@ -456,9 +456,9 @@ func main() {
 			defer mgo_conn.Close()
 			mgo_conn.SetMode(mgo.Monotonic, true)
 
-			for _, lab := range course.Labs {
+			for i, _ := range course.Labs {
 				//Give each lab a new unique id
-				lab.ID = bson.NewObjectId().Hex()
+				course.Labs[i].ID = bson.NewObjectId()
 			}
 			err := mgo_conn.DB(DB_name).C("courses").Insert(course)
 			if err != nil {
